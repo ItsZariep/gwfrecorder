@@ -1,0 +1,68 @@
+#!/bin/bash
+
+if [ -z "${TERMINAL}" ]; then
+	echo "WARNING: $TERMINAL environment variable is empty, assuming x-terminal-emulator"
+	TERMINAL = x-terminal-emulator
+else
+	:
+fi
+
+result=$(yad --title="GWF Recorder" --text="Configure video details:" \
+	--form \
+	--field="File Name":SFL "/home/$USER/recording.mkv" \
+	--field="Frame Rate":NUM "60" \
+	--field="Display":CBE "$(wlr-randr | grep -v '^ ' | awk '{print $1}' | paste -sd '!' -)" \
+	--field="Video Codec":CBE --combo "$(ffmpeg -hide_banner -encoders | grep -i "^ V" | awk '{print $2}' | tail -n +2 | paste -sd '!' -)" \
+	--field="Record audio":CHK FALSE \
+	--field="Audio Codec":CBE --combo "$(ffmpeg -hide_banner -encoders | grep -i "^ A" | awk '{print $2}' | tail -n +2 | paste -sd '!' -)" \
+	--field="Audio Input":CBE --combo "$(pactl list sources | grep Name | awk -F': ' '{print $2}' | paste -sd '!' -)" \
+	--field="Run in a terminal":CHK FALSE)
+
+if [ $? -ne 0 ]; then
+	echo "Dialog canceled."
+	exit 1
+fi
+
+IFS='|' read -r file_name frame_rate display video_codec record_audio audio_codec audio_input run_in_terminal <<< "$result"
+
+if [ -z "${filename}" ]; then
+	echo "WARNING: File name is empty, assuming /home/$USER/recording.mkv"
+	file_name = "/home/$USER/recording.mkv"
+else
+	:
+fi
+
+
+if [ "$record_audio" = "TRUE" ]; then
+	audiocmd="--audio=$audio_input"
+else
+	audiocmd=" "
+fi
+
+
+command="wf-recorder -o $display -r $frame_rate -c $video_codec --audio=$audio_input -C $audio_codec -f $file_name"
+
+postrun()
+{
+	yad --title="GWF Recorder" --button="Stop:1" --text="WF-Recorder is running in the background, press the button to stop recording"
+
+	if [ $? -eq 1 ]; then
+		pkill wf-recorder
+	else
+		kill -SIGINT $(pgrep -f wf-recorder)
+		exit 1
+	fi
+}
+
+postrun &
+
+# Run the recording command
+if [ "$run_in_terminal" == "TRUE" ]; then
+	$TERMINAL -e bash -c '$command'
+else
+	eval "$command"
+	if [ $? -ne 0 ]; then
+		echo "Error: Command failed, exiting postrun."
+		exit 1
+	fi
+fi
