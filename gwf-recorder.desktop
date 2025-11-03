@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=GWF Recorder
+Comment=wlroots screen recorder
+Comment[es]=Grabador de pantalla para wlroots
+Icon=accessories-screenshot-tool
+Exec=gwf-recorder
+Terminal=false
+Categories=AudioVideo;Video;Recorder;Qt;
+StartupNotify=true
